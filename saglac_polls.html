@@ -33,16 +33,19 @@
             margin-right: 8px;
             opacity: 0.7;
         }
-        #controls {
+        #controls-wrapper {
             position: absolute;
             top: 10px;
             right: 10px;
             z-index: 1000;
+            max-width: 300px;
+        }
+        
+        #controls {
             background: white;
             padding: 15px;
             border-radius: 8px;
             box-shadow: 0 0 15px rgba(0,0,0,0.2);
-            max-width: 300px;
         }
         .candidate-bar {
             height: 20px;
@@ -71,6 +74,42 @@
         .control-group {
             margin-bottom: 15px;
         }
+        .legend-toggle {
+            width: 100%;
+            background: white;
+            border: none;
+            border-radius: 4px 4px 0 0;
+            padding: 8px 12px;
+            font-size: 14px;
+            cursor: pointer;
+            font-weight: bold;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 0;
+        }
+
+        .legend-toggle:hover {
+            background: #f0f0f0;
+        }
+
+        .controls-hidden #controls {
+            display: none;
+        }
+        
+        .controls-hidden .legend-toggle {
+            border-radius: 4px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.2);
+        }
+
+        /* Mobile-specific styles */
+        @media (max-width: 768px) {
+            #controls-wrapper {
+                max-width: 250px;
+            }
+            
+            #controls {
+                padding: 10px;
+            }
+        }
         label {
             display: block;
             margin-bottom: 5px;
@@ -86,8 +125,10 @@
 </head>
 <body>
     <div id="map"></div>
-    <div id="controls">
-        <h3>Election Results</h3>
+    <div id="controls-wrapper">
+        <button class="legend-toggle" id="legendToggle">▼ Hide</button>
+        <div id="controls">
+            <h3>Election Results</h3>
         
         <div class="control-group">
             <label for="datasetSelect">Dataset:</label>
@@ -98,17 +139,10 @@
             </select>
         </div>
         
-        <div class="control-group">
-            <label for="viewSelect">View:</label>
-            <select id="viewSelect">
-                <option value="leading">Leading Candidate</option>
-                <!-- Candidate options will be populated automatically -->
-            </select>
-        </div>
-        
         <div id="legend">
             <h4>Legend</h4>
             <!-- Legend will be populated automatically -->
+        </div>
         </div>
     </div>
 
@@ -167,6 +201,7 @@
         let currentDataset = null;
         let candidateColors = {};
         let availableCandidates = [];
+        let legendVisible = true;
 
         // Load and display the initial dataset
         loadDataset('pollbypoll_bureauparbureau24018_election_simple.geojson');
@@ -176,18 +211,35 @@
             loadDataset(e.target.value);
         });
 
-        // Event listener for view selection
-        document.getElementById('viewSelect').addEventListener('change', function(e) {
-            currentView = e.target.value;
-            if (electionData) {
-                displayData(currentView);
+        document.getElementById('legendToggle').addEventListener('click', function() {
+            legendVisible = !legendVisible;
+            const controlsWrapper = document.getElementById('controls-wrapper');
+            const toggleButton = document.getElementById('legendToggle');
+            
+            if (legendVisible) {
+                controlsWrapper.classList.remove('controls-hidden');
+                toggleButton.textContent = '▼ Hide';
+            } else {
+                controlsWrapper.classList.add('controls-hidden');
+                toggleButton.textContent = '▲ Show';
             }
         });
+
+        if ('ontouchstart' in window) {
+            // Make controls more touch-friendly
+            const controls = document.getElementById('controls');
+            controls.style.touchAction = 'manipulation';
+            
+            // Increase tap target size for mobile
+            const selectElements = document.querySelectorAll('select');
+            selectElements.forEach(select => {
+                select.style.minHeight = '44px'; // Apple's recommended minimum tap target
+            });
+        }
 
         // Function to load a dataset
         function loadDataset(datasetFile) {
             currentDataset = datasetFile;
-            document.getElementById('viewSelect').innerHTML = '<option value="leading">Leading Candidate</option>';
             document.getElementById('legend').innerHTML = '<h4>Legend</h4><p>Loading...</p>';
 
             fetch(datasetFile)
@@ -238,16 +290,6 @@
             availableCandidates.forEach((candidate, index) => {
                 // Try to use known party colors first, then fall back to defaults
                 candidateColors[candidate] = partyColors[candidate] || partyColors[`default${(index % 6) + 1}`];
-            });
-
-            // Update the view selector
-            const viewSelect = document.getElementById('viewSelect');
-            viewSelect.innerHTML = '<option value="leading">Leading Candidate</option>';
-            availableCandidates.forEach(candidate => {
-                const option = document.createElement('option');
-                option.value = candidate;
-                option.textContent = candidate;
-                viewSelect.appendChild(option);
             });
 
             // Update the legend
