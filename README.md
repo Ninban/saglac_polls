@@ -17,12 +17,12 @@ pip install geopandas pandas
 ### Step-by-Step Guide
 
 #### 1. Download Election Results Data
-- Go to: https://www.elections.ca/content.aspx?section=res&dir=rep/off/45gedata&document=byed&lang=e
+- Go to: [Poll-by-poll Results, by Electoral District](https://www.elections.ca/content.aspx?section=res&dir=rep/off/45gedata&document=byed&lang=e)
 - Download the CSV file for your desired electoral district
 - Files are named like: `pollbypoll_bureauparbureauXXXXX.csv` (where XXXXX is the district number)
 
 #### 2. Download Polling Division Boundaries
-- Go to: https://www.elections.ca/content.aspx?section=res&dir=cir/mapsCorner/vector&document=index&lang=e
+- Go to: [Electoral Geography Boundary Files](https://www.elections.ca/content.aspx?section=res&dir=cir/mapsCorner/vector&document=index&lang=e)
 - Download the "Polling Division Boundaries - Shapefile" ZIP file
 - Extract the contents to your project folder (you should get files like `PD_CA_2025_EN.shp`)
 
@@ -68,10 +68,7 @@ To resolve this, you can start a local server and open the map:
 ```bash
 python -m http.server 8000
 ```
-Then visit http://localhost:8000/saglac_polls.html in your browser
-
-
-
+Then visit [http://localhost:8000/saglac_polls.html](http://localhost:8000/saglac_polls.html) in your browser
 
 ### Complete Workflow Example
 ```bash
