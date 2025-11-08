@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Election Results - Interactive Map</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+        }
+        #map {
+            height: 100vh;
+            width: 100%;
+        }
+        .info {
+            padding: 6px 8px;
+            background: white;
+            background: rgba(255,255,255,0.9);
+            box-shadow: 0 0 15px rgba(0,0,0,0.2);
+            border-radius: 5px;
+        }
+        .legend {
+            line-height: 18px;
+            color: #555;
+        }
+        .legend i {
+            width: 18px;
+            height: 18px;
+            float: left;
+            margin-right: 8px;
+            opacity: 0.7;
+        }
+        #controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.2);
+            max-width: 300px;
+        }
+        .candidate-bar {
+            height: 20px;
+            margin: 2px 0;
+            border-radius: 3px;
+        }
+        .candidate-legend {
+            display: flex;
+            align-items: center;
+            margin: 5px 0;
+        }
+        .candidate-color {
+            width: 20px;
+            height: 20px;
+            margin-right: 8px;
+            border-radius: 3px;
+        }
+        .popup-header {
+            margin-bottom: 10px;
+        }
+        .pd-name {
+            font-style: italic;
+            color: #666;
+            margin-top: 2px;
+        }
+        .control-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        select {
+            width: 100%;
+            padding: 5px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <div id="controls">
+        <h3>Election Results</h3>
+        
+        <div class="control-group">
+            <label for="datasetSelect">Dataset:</label>
+            <select id="datasetSelect">
+                <option value="pollbypoll_bureauparbureau24018_election_simple.geojson">Chicoutimi--Le Fjord</option>
+                <option value="pollbypoll_bureauparbureau24030_election_simple.geojson">Jonquière</option>
+                <option value="pollbypoll_bureauparbureau24033_election_simple.geojson">Lac-Saint-Jean</option>
+            </select>
+        </div>
+        
+        <div class="control-group">
+            <label for="viewSelect">View:</label>
+            <select id="viewSelect">
+                <option value="leading">Leading Candidate</option>
+                <!-- Candidate options will be populated automatically -->
+            </select>
+        </div>
+        
+        <div id="legend">
+            <h4>Legend</h4>
+            <!-- Legend will be populated automatically -->
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script>
+        // Party colors - consistent across all datasets
+        const partyColors = {
+            // Bloc Québécois - Blue
+            "Mario Simard": "#00B4D8",
+            "Marc St-Hilaire": "#00B4D8",
+            "Alexis Brunelle-Duceppe": "#00B4D8",
+            
+            // Conservative - Dark Blue
+            "Richard Martel": "#1A4D8F",
+            "Dave Blackburn": "#1A4D8F",
+            "Fanny Boulanger": "#1A4D8F",
+            
+            // Liberal - Red
+            "Stéphane Proulx": "#D71920",
+            "Denis Lemieux": "#D71920",
+            "William Van Tassel": "#D71920",
+            
+            // New Democratic - Orange
+            "Raphaël Émond": "#F58220",
+            "Hugues Boily-Maltais": "#F58220",
+            "Lise Garon": "#F58220",
+            
+            // Green - Green
+            "Yves Laporte": "#3D9B35",
+            "Marie-Josée Yelle": "#3D9B35",
+            
+            // People's Party - Purple
+            "François Sabourin": "#6441A5",
+            "Lorie Bouchard": "#6441A5",
+            "Patrick Gaudreault": "#6441A5",
+
+            // Default colors for unknown candidates
+            "default1": "#FF6B6B",
+            "default2": "#4ECDC4",
+            "default3": "#45B7D1",
+            "default4": "#96CEB4",
+            "default5": "#FECA57",
+            "default6": "#FF9FF3"
+        };
+
+        // Initialize map
+        const map = L.map('map').setView([48.4167, -71.2500], 11);
+
+        // Add base map
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        let electionData = null;
+        let currentView = 'leading';
+        let currentDataset = null;
+        let candidateColors = {};
+        let availableCandidates = [];
+
+        // Load and display the initial dataset
+        loadDataset('pollbypoll_bureauparbureau24018_election_simple.geojson');
+
+        // Event listener for dataset selection
+        document.getElementById('datasetSelect').addEventListener('change', function(e) {
+            loadDataset(e.target.value);
+        });
+
+        // Event listener for view selection
+        document.getElementById('viewSelect').addEventListener('change', function(e) {
+            currentView = e.target.value;
+            if (electionData) {
+                displayData(currentView);
+            }
+        });
+
+        // Function to load a dataset
+        function loadDataset(datasetFile) {
+            currentDataset = datasetFile;
+            document.getElementById('viewSelect').innerHTML = '<option value="leading">Leading Candidate</option>';
+            document.getElementById('legend').innerHTML = '<h4>Legend</h4><p>Loading...</p>';
+
+            fetch(datasetFile)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Failed to load ${datasetFile}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    electionData = data;
+                    analyzeDataset(data);
+                    displayData(currentView);
+                })
+                .catch(error => {
+                    console.error('Error loading dataset:', error);
+                    document.getElementById('legend').innerHTML = '<h4>Legend</h4><p style="color: red;">Error loading data</p>';
+                });
+        }
+
+        // Function to analyze the dataset and extract candidate information
+        function analyzeDataset(data) {
+            if (!data.features || data.features.length === 0) {
+                console.error('No features found in dataset');
+                return;
+            }
+
+            // Extract all candidate names from the first feature's properties
+            const firstFeature = data.features[0];
+            const properties = firstFeature.properties;
+            
+            // Find candidate columns (columns ending with _pct or that match known party names)
+            const allKeys = Object.keys(properties);
+            const candidateKeys = allKeys.filter(key => 
+                !['PD_NUM', 'PD_NAME', 'geometry', 'leading_candidate', 'leading_candidate_pct', 
+                  'Rejected Ballots/Bulletins rejetés', 'Total Votes/Total des votes', 'Electors/Électeurs',
+                  'rejected', 'total', 'electors'].includes(key) && 
+                !key.includes('_pct') && 
+                !key.includes('Rejected') && 
+                !key.includes('Total') && 
+                !key.includes('Electors')
+            );
+
+            availableCandidates = candidateKeys;
+            candidateColors = {};
+
+            // Assign colors to candidates
+            availableCandidates.forEach((candidate, index) => {
+                // Try to use known party colors first, then fall back to defaults
+                candidateColors[candidate] = partyColors[candidate] || partyColors[`default${(index % 6) + 1}`];
+            });
+
+            // Update the view selector
+            const viewSelect = document.getElementById('viewSelect');
+            viewSelect.innerHTML = '<option value="leading">Leading Candidate</option>';
+            availableCandidates.forEach(candidate => {
+                const option = document.createElement('option');
+                option.value = candidate;
+                option.textContent = candidate;
+                viewSelect.appendChild(option);
+            });
+
+            // Update the legend
+            updateLegend();
+        }
+
+        // Function to update the legend
+        function updateLegend() {
+            const legend = document.getElementById('legend');
+            let legendHTML = '<h4>Legend</h4>';
+            
+            if (availableCandidates.length === 0) {
+                legendHTML += '<p>No candidate data available</p>';
+            } else {
+                availableCandidates.forEach(candidate => {
+                    legendHTML += `
+                    <div class="candidate-legend">
+                        <div class="candidate-color" style="background-color: ${candidateColors[candidate]}"></div>
+                        <span>${candidate}</span>
+                    </div>`;
+                });
+            }
+            
+            legend.innerHTML = legendHTML;
+        }
+
+        // Function to get color based on candidate and percentage
+        function getColor(feature, view) {
+            const properties = feature.properties;
+            
+            if (view === 'leading') {
+                const candidate = properties.leading_candidate;
+                return candidateColors[candidate] || '#CCCCCC';
+            } else {
+                const percentage = properties[`${view}_pct`] || 0;
+                const baseColor = candidateColors[view];
+                if (!baseColor) return '#CCCCCC';
+                
+                // Simple intensity scaling
+                const intensity = percentage / 100;
+                return adjustColorBrightness(baseColor, intensity * 0.5 + 0.5);
+            }
+        }
+
+        // Helper function to adjust color brightness
+        function adjustColorBrightness(hex, factor) {
+            const r = parseInt(hex.slice(1, 3), 16);
+            const g = parseInt(hex.slice(3, 5), 16);
+            const b = parseInt(hex.slice(5, 7), 16);
+            
+            const newR = Math.min(255, Math.floor(r * factor));
+            const newG = Math.min(255, Math.floor(g * factor));
+            const newB = Math.min(255, Math.floor(b * factor));
+            
+            return `#${newR.toString(16).padStart(2, '0')}${newG.toString(16).padStart(2, '0')}${newB.toString(16).padStart(2, '0')}`;
+        }
+
+        // Function to create popup content
+        function createPopupContent(feature) {
+            const props = feature.properties;
+            let content = `<div class="station-popup">
+                <div class="popup-header">
+                    <h3>Polling Division ${props.PD_NUM}</h3>
+                    <div class="pd-name">${props.PD_NAME || 'Unknown Area'}</div>
+                </div>
+                <p><strong>Leading Candidate:</strong> ${props.leading_candidate} (${(props.leading_candidate_pct || 0).toFixed(1)}%)</p>
+                <p><strong>Total Votes:</strong> ${props['Total Votes/Total des votes'] || props.total || 0}</p>
+                <hr>
+                <h4>Detailed Results:</h4>`;
+            
+            availableCandidates.forEach(candidate => {
+                const votes = props[candidate] || 0;
+                const percentage = props[`${candidate}_pct`] || 0;
+                content += `
+                <div style="margin: 5px 0;">
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>${candidate}:</span>
+                        <span>${votes} (${percentage.toFixed(1)}%)</span>
+                    </div>
+                    <div class="candidate-bar" style="width: 100%; background: linear-gradient(90deg, ${candidateColors[candidate]} ${percentage}%, #eee ${percentage}%);"></div>
+                </div>`;
+            });
+            
+            content += `</div>`;
+            return content;
+        }
+
+        let currentLayer = null;
+
+        // Function to display data based on current view
+        function displayData(view) {
+            // Remove existing layer
+            if (currentLayer) {
+                map.removeLayer(currentLayer);
+            }
+
+            if (!electionData) {
+                console.error('No election data available');
+                return;
+            }
+
+            // Add new layer
+            currentLayer = L.geoJSON(electionData, {
+                style: function(feature) {
+                    return {
+                        fillColor: getColor(feature, view),
+                        weight: 2,
+                        opacity: 1,
+                        color: 'white',
+                        dashArray: '3',
+                        fillOpacity: 0.7
+                    };
+                },
+                onEachFeature: function(feature, layer) {
+                    layer.bindPopup(createPopupContent(feature));
+                }
+            }).addTo(map);
+
+            // Adjust map view to fit the data
+            if (currentLayer.getBounds().isValid()) {
+                map.fitBounds(currentLayer.getBounds());
+            }
+
+            currentView = view;
+        }
+    </script>
+</body>
+</html>
