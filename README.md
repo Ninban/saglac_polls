@@ -1,6 +1,6 @@
 # Election Results Mapper
 
-[Click here to view the map for Saguenay Lac-Saint-Jean](saglac_polls.html)
+[Click here to view the example map for Saguenay Lac-Saint-Jean](https://carlouellette.ca/saglac_polls/saglac_polls.html)
 
 ### Overview
 This project creates interactive maps of Canadian federal election results at the polling division level. It combines Elections Canada data with geographic boundaries to visualize voting patterns.
@@ -61,6 +61,13 @@ Add your district to the HTML dropdown in `saglac_polls.html`:
     <!-- Existing options -->
 </select>
 ```
+Optionally, you can update the candidate colors in the HTML file:
+```javascript
+const partyColors = {
+    "Candidate Name": "#XXXXXX",
+    // Existing party colors
+}
+```
 
 #### 6. View the Map
 When opening the HTML file directly in a browser, you may encounter CORS (Cross-Origin Resource Sharing) errors that prevent the GeoJSON files from loading.  
@@ -68,19 +75,32 @@ To resolve this, you can start a local server and open the map:
 ```bash
 python -m http.server 8000
 ```
-Then visit [http://localhost:8000/saglac_polls.html](http://localhost:8000/saglac_polls.html) in your browser
+Then visit [http://localhost:8000/saglac_polls.html](http://localhost:8000/saglac_polls.html) or your new HTML file in your browser
 
 ### Complete Workflow Example
+#### 1. Convert shapefile to GeoJSON
 ```bash
-# 1. Convert shapefile to GeoJSON
 python togeojson.py
-
-# 2. Process election data for district 24030
-python filtergeojson.py pollbypoll_bureauparbureau24030.csv polling_divisions.geojson jonquiere
-
-# 3. Open the HTML file in your browser
-open saglac_polls.html
 ```
+
+#### 2. Process election data for district 24030
+```bash
+python filtergeojson.py pollbypoll_bureauparbureau24030.csv
+```
+
+#### 3. Update the HTML file with your new district
+```html
+<select id="datasetSelect">
+    <option value="pollbypoll_bureauparbureau24030_election_simple.geojson">Jonquière</option>
+    <!-- Existing options -->
+</select>
+```
+
+#### 4. Open the HTML file in your browser
+```bash
+python -m http.server 8000
+```
+Then visit [http://localhost:8000/saglac_polls.html](http://localhost:8000/saglac_polls.html) or your own HTML file in your browser
 
 ### File Structure
 ```
@@ -93,15 +113,3 @@ project/
 ├── pollbypoll_bureauparbureauXXXXX.csv  # Election results
 └── *_election_simple.geojson # Generated map data
 ```
-
-### Features
-- Switch between multiple electoral districts
-- View results by leading candidate or individual candidates
-- Interactive popups with detailed results
-- Responsive design for all devices
-
-### Troubleshooting
-- Ensure all shapefile components (.shp, .shx, .dbf, .prj) are in the same directory
-- Check that district numbers match between CSV and shapefile
-- Verify Python packages are correctly installed
-- Run `togeojson.py` before `filtergeojson.py`
